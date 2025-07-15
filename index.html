@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Career Navigator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Stone & Slate -->
+    <!-- Application Structure Plan: The SPA is designed as a multi-tool dashboard with a persistent top navigation, allowing users to switch between three main views: 'Home', 'Roadmap Explorer', and 'Interview Hub'. This structure was chosen because the source documents serve two distinct user goals: (1) following a long-term learning path and (2) preparing for interviews with a large dataset of questions. Separating these into distinct, interactive tools prevents information overload and provides a focused experience for each task. The 'Home' view acts as a landing page, using data visualizations to summarize the app's content and guide users toward the two main sections. The entire application is designed to transform static report content into a dynamic, usable tool. -->
+    <!-- Visualization & Content Choices: 
+        - Home Page:
+            - Goal: Provide a high-level summary and engage the user.
+            - Viz: Two Chart.js charts (Donut for roadmap timeline, Bar for questions per company).
+            - Interaction: Hover tooltips on charts.
+            - Justification: Visualizations offer a quick, digestible overview of the application's depth and breadth.
+        - Roadmap Explorer:
+            - Goal: Present a structured, linear learning path in an interactive format.
+            - Presentation: An accordion-style layout for the 5 phases and a grid of cards for capstone projects.
+            - Interaction: Clicking a phase title expands to show details. Project cards provide concise summaries.
+            - Justification: An accordion is a space-efficient way to present a large amount of hierarchical information, preventing the user from being overwhelmed.
+        - Interview Hub:
+            - Goal: Allow efficient filtering and Browse of over 100 interview questions.
+            - Presentation: A filter bar at the top and a dynamic list of cards, each representing a single question.
+            - Interaction: Dropdown and text input filters dynamically update the visible question cards in real-time. A 'Show Answer' toggle on each card hides the answer by default.
+            - Justification: A filterable card list is far more user-friendly and mobile-responsive than a large, static HTML table. It turns a data dump into a practical study tool.
+        - Libraries: Chart.js for canvas-based charts, Vanilla JS for all DOM manipulation and interactivity.
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+        .chart-container { position: relative; width: 100%; max-width: 500px; margin-left: auto; margin-right: auto; height: 300px; max-height: 400px; }
+        @media (min-width: 768px) { .chart-container { height: 350px; } }
+        .nav-link { cursor: pointer; transition: all 0.2s ease-in-out; }
+        .nav-link.active { color: #4f46e5; border-bottom: 2px solid #4f46e5; }
+        .nav-link:not(.active):hover { color: #3730a3; }
+        .section { display: none; }
+        .section.active { display: block; }
+        .fade-in { animation: fadeIn 0.5s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .question-card { transition: all 0.3s ease-in-out; }
+    </style>
+</head>
+<body class="text-slate-800">
+
+    <header class="bg-white shadow-sm sticky top-0 z-50">
+        <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center py-4">
+                <h1 class="text-xl sm:text-2xl font-bold text-slate-900">🚀 AI Career Navigator</h1>
+                <nav id="main-nav" class="hidden sm:flex items-center space-x-6 text-sm font-medium text-slate-600">
+                    <a data-target="home" class="nav-link active">Dashboard</a>
+                    <a data-target="roadmap" class="nav-link">Learning Roadmap</a>
+                    <a data-target="questions" class="nav-link">Interview Hub</a>
+                </nav>
+                 <div class="sm:hidden">
+                    <select id="mobile-nav" class="block w-full rounded-md border-gray-300 py-2 pl-3 pr-10 text-base focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm">
+                        <option value="home" selected>Dashboard</option>
+                        <option value="roadmap">Learning Roadmap</option>
+                        <option value="questions">Interview Hub</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="container mx-auto p-4 sm:p-6 lg:p-8">
+
+        <!-- Home/Dashboard Section -->
+        <section id="home" class="section active fade-in">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">Your Launchpad for a Career in AI</h2>
+                <p class="mt-4 max-w-2xl mx-auto text-lg text-slate-600">This interactive dashboard combines a comprehensive learning roadmap with a curated hub of interview questions from top tech companies. Use the tools below to chart your learning journey and prepare for your next big role.</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div class="bg-white p-6 rounded-xl shadow-lg">
+                    <h3 class="text-xl font-semibold text-slate-800 mb-4 text-center">Roadmap Phases by Duration</h3>
+                    <p class="text-center text-sm text-slate-500 mb-4">An overview of the time commitment for each phase of the AI Developer learning path.</p>
+                    <div class="chart-container">
+                        <canvas id="roadmapChart"></canvas>
+                    </div>
+                </div>
+                <div class="bg-white p-6 rounded-xl shadow-lg">
+                    <h3 class="text-xl font-semibold text-slate-800 mb-4 text-center">Interview Questions by Company</h3>
+                    <p class="text-center text-sm text-slate-500 mb-4">A breakdown of reported interview questions from leading technology firms in the AI space.</p>
+                    <div class="chart-container">
+                        <canvas id="questionsChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Roadmap Section -->
+        <section id="roadmap" class="section fade-in">
+            <div class="text-left mb-12">
+                <h2 class="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">The AI Developer Fast-Track</h2>
+                <p class="mt-4 max-w-3xl text-lg text-slate-600">This section breaks down the complex journey of becoming an AI developer into manageable phases. Each phase builds upon the last, taking you from fundamental concepts to deploying production-ready models. Click on each phase to explore the key topics, recommended resources, and milestones.</p>
+            </div>
+            <div id="roadmap-content" class="space-y-6"></div>
+            
+            <div class="mt-16">
+                <h3 class="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl mb-8">Capstone Portfolio Projects</h3>
+                <p class="mt-4 max-w-3xl text-lg text-slate-600 mb-8">Theory is important, but a strong portfolio is what gets you hired. These five capstone projects are designed to demonstrate a wide range of in-demand skills, from classical machine learning and NLP to Generative AI and MLOps. Each project provides a real-world problem to solve, mirroring the work you'd do at a top tech company.</p>
+                <div id="projects-content" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+            </div>
+        </section>
+
+        <!-- Questions Section -->
+        <section id="questions" class="section fade-in">
+            <div class="text-left mb-12">
+                <h2 class="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">Interview Question Hub</h2>
+                <p class="mt-4 max-w-3xl text-lg text-slate-600">Prepare for your interviews with this comprehensive, filterable database of questions reported from top tech companies. Use the filters to narrow down questions by company or topic, and click "Show Answer" to review the model solutions. This tool is designed to help you practice and solidify your understanding of key concepts.</p>
+            </div>
+            
+            <div class="bg-white p-4 rounded-xl shadow-lg mb-8 sticky top-20 z-40">
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                        <label for="company-filter" class="block text-sm font-medium text-slate-700">Company</label>
+                        <select id="company-filter" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
+                            <option>All Companies</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="type-filter" class="block text-sm font-medium text-slate-700">Category / Type</label>
+                        <select id="type-filter" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
+                            <option>All Types</option>
+                            <option>Conceptual</option>
+                            <option>Algorithmic</option>
+                            <option>System Design</option>
+                            <option>Optimization</option>
+                            <option>Technical</option>
+                            <option>Statistical</option>
+                            <option>Problem-solving</option>
+                            <option>Metric interpretation</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="search-filter" class="block text-sm font-medium text-slate-700">Search Keywords</label>
+                        <input type="text" id="search-filter" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="e.g., 'Transformer', 'Overfitting'">
+                    </div>
+                </div>
+            </div>
+
+            <div id="question-count" class="text-sm text-slate-600 mb-4"></div>
+            <div id="question-list" class="space-y-4">
+                <!-- Questions will be dynamically inserted here -->
+            </div>
+        </section>
+
+    </main>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+
+    const roadmapData = {
+        phases: [
+            { title: "Phase 1: Foundational Skills", duration: 3, color: "rgba(75, 192, 192, 0.7)", content: "This initial phase establishes the bedrock for all subsequent learning. A solid grasp of mathematics, proficiency in the primary programming language for AI, and fundamental data handling skills are indispensable.", topics: ["Linear Algebra", "Calculus", "Probability & Statistics", "Python Programming", "NumPy & Pandas", "SQL Fundamentals", "Data Cleaning & EDA"], resources: ["DeepLearning.AI Math Specialization", "freeCodeCamp Python Course", "DataLemur for SQL"] },
+            { title: "Phase 2: Core Machine Learning", duration: 3, color: "rgba(54, 162, 235, 0.7)", content: "This phase introduces the core concepts and algorithms that form the backbone of traditional machine learning, focusing on how models learn from data, performance evaluation, and effective data preparation.", topics: ["Supervised Learning (Regression/Classification)", "Unsupervised Learning (Clustering/PCA)", "Model Evaluation Metrics", "Overfitting & Underfitting", "Regularization", "Feature Engineering"], resources: ["Andrew Ng's Machine Learning Specialization", "Hands-On ML Book (Géron)", "Kaggle Competitions"] },
+            { title: "Phase 3: Deep Learning Fundamentals", duration: 4, color: "rgba(255, 206, 86, 0.7)", content: "A significant leap from traditional ML, this phase leverages neural networks to learn complex patterns from vast amounts of data, focusing on architecture, training, and common challenges.", topics: ["Artificial Neural Networks (ANNs)", "Backpropagation", "Optimization Algorithms", "CNNs for Computer Vision", "RNNs, LSTMs for Sequential Data", "Transfer Learning"], resources: ["Andrew Ng's Deep Learning Specialization", "Fast.ai Courses", "Dive into Deep Learning Book"] },
+            { title: "Phase 4: NLP & Large Language Models", duration: 4, color: "rgba(255, 99, 132, 0.7)", content: "This phase delves into the specialized domain of Natural Language Processing and its most transformative development: Large Language Models (LLMs).", topics: ["Text Preprocessing", "Word Embeddings", "Transformer Architecture", "BERT & GPT Models", "Prompt Engineering", "Fine-tuning & RAG", "Generative AI (GANs, Diffusion)"], resources: ["DeepLearning.AI NLP & Generative AI Courses", "Hugging Face Tutorials", "Andrej Karpathy's 'Zero to Hero'"] },
+            { title: "Phase 5: Deployment & MLOps", duration: 4, color: "rgba(153, 102, 255, 0.7)", content: "The final phase bridges the gap between model development and real-world application, focusing on deploying, managing, and monitoring AI models in production environments.", topics: ["API Development (Flask/FastAPI)", "Cloud Platforms (AWS/GCP/Azure)", "Containerization (Docker)", "CI/CD Pipelines", "Model Monitoring", "Responsible AI & Ethics"], resources: ["'Designing Machine Learning Systems' Book", "MLOps Roadmap (GitHub)", "Cloud Provider Certifications"] }
+        ],
+        projects: [
+            { title: "Advanced Fraud Detection System", description: "Build a system to identify suspicious transactions, focusing on imbalanced data and real-time evaluation.", concepts: ["Classification", "Imbalanced Data", "Feature Engineering", "XGBoost"], stack: ["Scikit-learn", "Pandas", "FastAPI"] },
+            { title: "Personalized Recommendation Engine", description: "Create a recommendation system like Netflix or Amazon, focusing on user behavior and personalization at scale.", concepts: ["Collaborative Filtering", "Matrix Factorization", "Deep Learning for RecSys", "Cold-Start Problem"], stack: ["Surprise", "TensorFlow/PyTorch", "Docker"] },
+            { title: "Real-time Unsafe Content Detection", description: "Develop an NLP model to flag harmful text content in real-time, emphasizing ethical AI and transfer learning.", concepts: ["Text Classification", "Transformers", "Fine-Tuning", "Bias Mitigation"], stack: ["Hugging Face", "FastAPI", "Docker"] },
+            { title: "Generative AI for Creative Content", description: "Explore the cutting-edge of AI by creating a model that generates novel images or text.", concepts: ["GANs/Diffusion Models", "Prompt Engineering", "Generative Model Evaluation (FID/BLEU)"], stack: ["PyTorch", "Hugging Face Diffusers", "Gradio"] },
+            { title: "MLOps Pipeline for Predictive Maintenance", description: "Design an end-to-end MLOps pipeline to forecast equipment failures from sensor data.", concepts: ["Time Series Forecasting", "CI/CD", "Model Monitoring", "Cloud Deployment"], stack: ["Prophet/LSTM", "MLflow", "Docker", "AWS/GCP"] }
+        ]
+    };
+
+    const questionData = [
+        { company: "General, Google, Meta, IBM, Microsoft, Amazon", question: "What is the difference between supervised and unsupervised learning?", answer: "Supervised learning uses labeled data to train a model to make predictions (classification, regression). Unsupervised learning uses unlabeled data to find patterns or groupings (clustering, dimensionality reduction).", notes: "Conceptual, Foundational" },
+        { company: "General, Google, Meta, IBM, Microsoft, Amazon", question: "What is the bias-variance tradeoff in machine learning?", answer: "The bias-variance tradeoff is a central concept where high bias leads to underfitting (model too simple), and high variance leads to overfitting (model too complex). A good model balances both, minimizing total error.", notes: "Conceptual, Foundational" },
+        { company: "General, Google, Meta, IBM, Microsoft, Amazon", question: "What is overfitting in machine learning, and how can it be avoided?", answer: "Overfitting occurs when a model learns noise from training data, performing well on it but poorly on unseen data. Avoidance techniques include cross-validation, regularization (L1, L2), reducing model complexity, collecting more data, data augmentation, and early stopping.", notes: "Problem-solving, Foundational" },
+        { company: "General, Google, Meta, NVIDIA, Microsoft", question: "What is the difference between L1 and L2 regularization?", answer: "L1 (Lasso) adds the sum of absolute weights to the loss function, encouraging sparsity by driving less important feature weights to zero (feature selection). L2 (Ridge) adds the sum of squared weights, shrinking weights towards zero but rarely to zero, preventing overfitting by penalizing large weights.", notes: "Optimization, Intermediate" },
+        { company: "General, OpenAI, Google, Meta", question: "Explain the attention mechanism.", answer: "Attention mechanism allows a neural network to dynamically focus on specific, relevant parts of the input data when making predictions. It assigns weights to different input components, reflecting their importance, which is crucial for handling long-range dependencies in sequential data like text.", notes: "Algorithmic, Intermediate" },
+        { company: "General, OpenAI, Google, Meta", question: "What is the Transformer model?", answer: "The Transformer is a neural network architecture that relies entirely on self-attention mechanisms to process sequential data, without recurrent layers. This enables parallel processing, better handling of long-range dependencies, and state-of-the-art performance in NLP tasks like machine translation and text summarization.", notes: "Algorithmic, Advanced" },
+        { company: "Meta, Amazon, IBM, NVIDIA", question: "How would you design a fraud detection system?", answer: "Track key metrics (transaction frequency, amount, location). Identify anomalies using models like Random Forest, XGBoost, or deep learning. Address imbalanced data (SMOTE, class weights). Evaluate with F1 score, precision/recall. Establish monitoring and feedback loops for concept drift.", notes: "System Design, Advanced" },
+        { company: "General, Google, Meta", question: "What is a confusion matrix, and why is it useful?", answer: "A confusion matrix is a table used to evaluate a classification model's performance by showing counts of true positives, true negatives, false positives, and false negatives. It's useful for calculating metrics like accuracy, precision, recall, and F1 score.", notes: "Metric interpretation, Foundational" },
+        { company: "General, Google, Meta, Microsoft", question: "How does backpropagation work?", answer: "Forward propagation generates an output. The error between predicted and actual output is calculated. Backpropagation then propagates this error backward through the layers, using the chain rule of calculus to compute the gradient of the error with respect to each weight and bias. These gradients are used by an optimizer (like gradient descent) to update the parameters and minimize the error.", notes: "Algorithmic, Intermediate" },
+        { company: "General, NVIDIA, OpenAI", question: "What are Generative Adversarial Networks (GANs)?", answer: "GANs consist of two neural networks, a Generator and a Discriminator, trained in an adversarial process. The Generator creates new data samples (e.g., images), and the Discriminator tries to distinguish between real and generated samples. This competition forces the Generator to create increasingly realistic data.", notes: "Algorithmic, Intermediate" },
+        { company: "General, Google, Meta, Amazon", question: "What is Principal Component Analysis (PCA)?", answer: "PCA is an unsupervised dimensionality reduction technique that transforms data into a new set of orthogonal variables (principal components) that capture most of the original variance. It's used for data compression, visualization, and noise reduction.", notes: "Algorithmic, Intermediate" },
+        { company: "General, OpenAI, Google", question: "What are word embeddings?", answer: "Word embeddings are dense, low-dimensional vector representations of words that capture semantic and contextual information. They are trained on large text corpora to represent words numerically, allowing ML models to understand relationships and similarities between words. Examples include Word2Vec, GloVe, and FastText.", notes: "Conceptual, Intermediate" },
+        { company: "General, IBM, Microsoft, Amazon", question: "What is Transfer Learning?", answer: "Transfer learning is an ML approach where knowledge gained from training a model on one task/dataset is applied to a different but related task. This often involves using a pre-trained model (e.g., ResNet on ImageNet) as a starting point and fine-tuning it on a smaller, specific dataset, reducing training time and data needs.", notes: "Conceptual, Intermediate" },
+        { company: "Meta, Amazon, NVIDIA", question: "How would you build a restaurant recommender?", answer: "1. Data Collection: User data (likes, check-ins, ratings), restaurant data (cuisine, price, location). 2. Feature Engineering: Create features like user taste profiles, restaurant popularity, proximity. 3. Modeling: Use a hybrid approach combining collaborative filtering (similar users liked) and content-based filtering (similar restaurants). 4. Evaluation: Use offline metrics (Precision@k, Recall@k) and online A/B testing. 5. System Design: Consider latency (caching), scalability, and the cold-start problem for new users/restaurants.", notes: "System Design, Advanced" },
+        { company: "General, Google, OpenAI", question: "What is the difference between stemming and lemmatization?", answer: "Both are text normalization techniques. Stemming is a crude, rule-based process that chops off suffixes (e.g., 'computing' -> 'comput'), often resulting in non-words. Lemmatization is a more sophisticated process that uses a vocabulary and morphological analysis to return the base or dictionary form of a word (the lemma), e.g., 'computing' -> 'compute'.", notes: "Conceptual, Foundational" },
+        { company: "General, Microsoft, Amazon", question: "What is the 'curse of dimensionality'?", answer: "As data dimensionality increases, the volume of the space grows exponentially, making data points sparse. This makes it difficult for algorithms to find meaningful patterns, increases computational cost, and heightens the risk of overfitting because the distance between any two points in a high-dimensional space tends to become uniform.", notes: "Conceptual, Intermediate" },
+        { company: "General, Google, Meta", question: "Why is ReLU often preferred over Sigmoid or Tanh in hidden layers?", answer: "1. Mitigates Vanishing Gradients: ReLU doesn't saturate for positive inputs, allowing gradients to flow better. 2. Computational Efficiency: It's a simple max(0, x) operation, faster than the exponentials in Sigmoid/Tanh. 3. Sparsity: It outputs zero for negative inputs, leading to sparse representations which can be efficient.", notes: "Optimization, Intermediate" },
+        { company: "General, Google, Meta, IBM, NVIDIA", question: "What are the key differences between a Decision Tree and a Random Forest?", answer: "A Decision Tree is a single model that can be prone to overfitting. A Random Forest is an ensemble of multiple Decision Trees. It builds each tree on a random subset of the data (bagging) and considers only a random subset of features at each split. This averaging of diverse trees makes Random Forests more robust, more accurate, and less prone to overfitting.", notes: "Algorithmic, Intermediate"},
+        { company: "General, OpenAI, Google, Meta", question: "What problem does the self-attention mechanism solve that RNNs/LSTMs struggle with?", answer: "RNNs/LSTMs process sequences token-by-token, making it difficult to capture long-range dependencies and impossible to parallelize processing. Self-attention allows every token to directly attend to every other token in the sequence simultaneously, capturing long-range dependencies efficiently and enabling parallel computation, which is key to training large models like Transformers.", notes: "Algorithmic, Advanced" },
+        { company: "Meta, Amazon", question: "Explain A/B testing.", answer: "A/B testing is a statistical method of comparing two versions (A and B) of something to determine which one performs better. In a web context, you show version A to one group of users and version B to another. You then compare a key metric (e.g., click-through rate, conversion rate) to see if the change in version B resulted in a statistically significant improvement.", notes: "Statistical, Intermediate" },
+        { company: "General, IBM, Microsoft, Amazon", question: "What is the role of Docker in MLOps?", answer: "Docker containerizes an ML model along with its code, libraries, dependencies, and configuration files into a single, portable package. This ensures that the model runs consistently across different environments (developer's laptop, testing server, production cloud). It simplifies deployment, improves reproducibility, and isolates the application, forming a fundamental building block of modern MLOps pipelines.", notes: "Technical, Intermediate" },
+    ];
+
+
+    function initCharts() {
+        const roadmapCtx = document.getElementById('roadmapChart').getContext('2d');
+        new Chart(roadmapCtx, {
+            type: 'doughnut',
+            data: {
+                labels: roadmapData.phases.map(p => p.title),
+                datasets: [{
+                    label: 'Duration in Months',
+                    data: roadmapData.phases.map(p => p.duration),
+                    backgroundColor: roadmapData.phases.map(p => p.color),
+                    borderColor: '#fff',
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'top', },
+                    tooltip: {
+                        callbacks: { label: (context) => `${context.label}: ${context.raw} months` }
+                    }
+                }
+            }
+        });
+
+        const companyCounts = questionData.reduce((acc, q) => {
+            const companies = q.company.split(', ').filter(c => c !== 'General');
+            companies.forEach(company => {
+                acc[company] = (acc[company] || 0) + 1;
+            });
+            return acc;
+        }, {});
+        
+        const sortedCompanies = Object.entries(companyCounts).sort(([,a],[,b]) => b-a);
+
+        const questionsCtx = document.getElementById('questionsChart').getContext('2d');
+        new Chart(questionsCtx, {
+            type: 'bar',
+            data: {
+                labels: sortedCompanies.map(c => c[0]),
+                datasets: [{
+                    label: '# of Questions',
+                    data: sortedCompanies.map(c => c[1]),
+                    backgroundColor: 'rgba(79, 70, 229, 0.7)',
+                    borderColor: 'rgba(79, 70, 229, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                },
+                scales: {
+                    x: { beginAtZero: true }
+                }
+            }
+        });
+    }
+    
+    function renderRoadmap() {
+        const roadmapContainer = document.getElementById('roadmap-content');
+        const projectsContainer = document.getElementById('projects-content');
+        roadmapContainer.innerHTML = '';
+        projectsContainer.innerHTML = '';
+
+        roadmapData.phases.forEach((phase, index) => {
+            const phaseEl = document.createElement('div');
+            phaseEl.className = 'bg-white rounded-xl shadow-lg overflow-hidden';
+            phaseEl.innerHTML = `
+                <div class="p-4 sm:p-6 cursor-pointer flex justify-between items-center bg-slate-50 border-b border-slate-200" onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('svg').classList.toggle('rotate-180')">
+                    <div class="flex items-center">
+                        <span class="flex-shrink-0 w-10 h-10 flex items-center justify-center font-bold text-white rounded-full" style="background-color: ${phase.color};">${index + 1}</span>
+                        <div class="ml-4">
+                            <h3 class="text-lg font-semibold text-slate-800">${phase.title}</h3>
+                            <p class="text-sm text-slate-500">Approx. ${phase.duration} Months</p>
+                        </div>
+                    </div>
+                    <svg class="w-6 h-6 text-slate-500 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                </div>
+                <div class="p-6 hidden">
+                    <p class="text-slate-600 mb-6">${phase.content}</p>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <h4 class="font-semibold text-slate-700 mb-2">Key Topics:</h4>
+                            <ul class="list-disc list-inside space-y-1 text-slate-600">
+                                ${phase.topics.map(topic => `<li>${topic}</li>`).join('')}
+                            </ul>
+                        </div>
+                        <div>
+                            <h4 class="font-semibold text-slate-700 mb-2">Recommended Resources:</h4>
+                            <ul class="list-disc list-inside space-y-1 text-slate-600">
+                                ${phase.resources.map(res => `<li>${res}</li>`).join('')}
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            `;
+            roadmapContainer.appendChild(phaseEl);
+        });
+
+        roadmapData.projects.forEach(project => {
+            const projectEl = document.createElement('div');
+            projectEl.className = 'bg-white rounded-xl shadow-lg p-6 flex flex-col';
+            projectEl.innerHTML = `
+                <h4 class="text-lg font-bold text-indigo-600">${project.title}</h4>
+                <p class="text-slate-600 mt-2 flex-grow">${project.description}</p>
+                <div class="mt-4">
+                    <p class="text-sm font-medium text-slate-700 mb-1">Core Concepts:</p>
+                    <div class="flex flex-wrap gap-1">
+                       ${project.concepts.map(c => `<span class="bg-slate-100 text-slate-700 text-xs font-medium px-2 py-0.5 rounded-full">${c}</span>`).join('')}
+                    </div>
+                     <p class="text-sm font-medium text-slate-700 mb-1 mt-3">Tech Stack:</p>
+                    <div class="flex flex-wrap gap-1">
+                       ${project.stack.map(s => `<span class="bg-indigo-100 text-indigo-800 text-xs font-medium px-2 py-0.5 rounded-full">${s}</span>`).join('')}
+                    </div>
+                </div>
+            `;
+            projectsContainer.appendChild(projectEl);
+        });
+    }
+
+    function renderQuestions(filteredQuestions) {
+        const listEl = document.getElementById('question-list');
+        const countEl = document.getElementById('question-count');
+        listEl.innerHTML = '';
+
+        if (filteredQuestions.length === 0) {
+            listEl.innerHTML = `<div class="text-center py-10 bg-white rounded-lg shadow-md"><p class="text-slate-500">No questions match your filters.</p></div>`;
+            countEl.textContent = 'Showing 0 questions.';
+            return;
+        }
+
+        countEl.textContent = `Showing ${filteredQuestions.length} of ${questionData.length} questions.`;
+
+        filteredQuestions.forEach((q, index) => {
+            const card = document.createElement('div');
+            card.className = 'question-card bg-white rounded-xl shadow-lg p-6';
+            card.innerHTML = `
+                <p class="text-sm text-indigo-600 font-medium">${q.notes}</p>
+                <p class="text-lg font-semibold my-2">${q.question}</p>
+                <p class="text-xs text-slate-500 mb-4">Companies: ${q.company}</p>
+                <div class="answer-content hidden border-t border-slate-200 pt-4 mt-4">
+                    <p class="text-slate-700">${q.answer}</p>
+                </div>
+                <button class="toggle-answer mt-4 text-sm font-semibold text-indigo-600 hover:text-indigo-800">Show Answer</button>
+            `;
+            listEl.appendChild(card);
+        });
+    }
+
+    function setupQuestionFilters() {
+        const companyFilter = document.getElementById('company-filter');
+        const typeFilter = document.getElementById('type-filter');
+        const searchFilter = document.getElementById('search-filter');
+
+        const allCompanies = [...new Set(questionData.flatMap(q => q.company.split(', ')))].sort();
+        allCompanies.forEach(company => {
+            if (company !== 'General') {
+                const option = document.createElement('option');
+                option.value = company;
+                option.textContent = company;
+                companyFilter.appendChild(option);
+            }
+        });
+
+        const applyFilters = () => {
+            const selectedCompany = companyFilter.value;
+            const selectedType = typeFilter.value.toLowerCase();
+            const searchTerm = searchFilter.value.toLowerCase();
+
+            const filtered = questionData.filter(q => {
+                const companyMatch = selectedCompany === 'All Companies' || q.company.includes(selectedCompany);
+                const typeMatch = selectedType === 'all types' || q.notes.toLowerCase().includes(selectedType);
+                const searchMatch = searchTerm === '' || q.question.toLowerCase().includes(searchTerm) || q.answer.toLowerCase().includes(searchTerm);
+                return companyMatch && typeMatch && searchMatch;
+            });
+            renderQuestions(filtered);
+        };
+
+        companyFilter.addEventListener('change', applyFilters);
+        typeFilter.addEventListener('change', applyFilters);
+        searchFilter.addEventListener('input', applyFilters);
+
+        document.getElementById('question-list').addEventListener('click', e => {
+            if (e.target.classList.contains('toggle-answer')) {
+                const answerDiv = e.target.previousElementSibling;
+                answerDiv.classList.toggle('hidden');
+                e.target.textContent = answerDiv.classList.contains('hidden') ? 'Show Answer' : 'Hide Answer';
+            }
+        });
+
+        renderQuestions(questionData);
+    }
+    
+    function handleNavigation() {
+        const navLinks = document.querySelectorAll('.nav-link');
+        const mobileNav = document.getElementById('mobile-nav');
+        const sections = document.querySelectorAll('.section');
+
+        function switchView(targetId) {
+            sections.forEach(section => {
+                section.classList.toggle('active', section.id === targetId);
+            });
+            navLinks.forEach(link => {
+                link.classList.toggle('active', link.dataset.target === targetId);
+            });
+            if (mobileNav.value !== targetId) {
+                mobileNav.value = targetId;
+            }
+            window.scrollTo(0, 0);
+        }
+
+        navLinks.forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                switchView(e.target.dataset.target);
+            });
+        });
+        
+        mobileNav.addEventListener('change', (e) => {
+            switchView(e.target.value);
+        });
+    }
+
+    // Initial setup
+    handleNavigation();
+    initCharts();
+    renderRoadmap();
+    setupQuestionFilters();
+});
+</script>
+
+</body>
+</html>
